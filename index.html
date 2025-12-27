@@ -211,6 +211,26 @@
             color: #999;
         }
 
+        .review-btn {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: #f39c12;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .review-btn:hover {
+            background: #e67e22;
+            transform: translateY(-2px);
+        }
+
         .controls {
             display: flex;
             gap: 15px;
@@ -313,6 +333,10 @@
                 <div class="stat-value" id="totalCards">0</div>
             </div>
             <div class="stat-item">
+                <div class="stat-label">To Review</div>
+                <div class="stat-value" id="reviewCount">0</div>
+            </div>
+            <div class="stat-item">
                 <div class="stat-label">Progress</div>
                 <div class="stat-value" id="progress">0%</div>
             </div>
@@ -325,12 +349,14 @@
                 <div class="question" id="question">Question</div>
             </div>
             <div class="flip-hint">Click to flip</div>
+            <button class="review-btn" id="reviewBtn" onclick="toggleReview(event)">⚑ Mark for Review</button>
         </div>
 
         <div class="controls">
             <button onclick="previousCard()" id="prevBtn">← Previous</button>
             <button onclick="nextCard()" id="nextBtn">Next →</button>
             <button onclick="shuffleCards()" class="shuffle-btn">🔀 Shuffle</button>
+            <button onclick="toggleReviewMode()" id="reviewModeBtn" class="review-mode-btn">Show Review Cards</button>
             <button onclick="reset()" class="secondary-btn">Upload New File</button>
         </div>
     </div>
@@ -338,8 +364,10 @@
 
 <script>
     let flashcards = [];
+    let allFlashcards = [];
     let currentIndex = 0;
     let isFlipped = false;
+    let reviewMode = false;
 
     const uploadSection = document.getElementById('uploadSection');
     const sampleSection = document.getElementById('sampleSection');
@@ -409,18 +437,21 @@
                     topic: matches[0].replace(/"/g, '').trim(),
                     difficulty: matches[1].replace(/"/g, '').trim(),
                     question: matches[2].replace(/"/g, '').trim(),
-                    answer: matches[3].replace(/"/g, '').trim()
+                    answer: matches[3].replace(/"/g, '').trim(),
+                    needsReview: false
                 };
             }
             return null;
         }).filter(card => card !== null);
 
         if (flashcards.length > 0) {
+            allFlashcards = [...flashcards]
             currentIndex = 0;
             uploadSection.style.display = 'none';
             sampleSection.style.display = 'none';
             flashcardContainer.style.display = 'block';
             showCard();
+            updateReviewCount();
         } else {
             alert('No valid flashcards found in the CSV file. Please check the format.');
         }
@@ -461,6 +492,7 @@
         // Update button states
         document.getElementById('prevBtn').disabled = currentIndex === 0;
         document.getElementById('nextBtn').disabled = currentIndex === flashcards.length - 1;
+        updateReviewBtn()
     }
 
     function flipCard() {
@@ -473,6 +505,71 @@
             cardContent.innerHTML = `<div class="question">${card.question}</div>`;
         }
         isFlipped = !isFlipped;
+    }
+
+    function toggleReview(event) {
+        event.stopPropagation();
+
+        flashcards[currentIndex].needsReview = !flashcards[currentIndex].needsReview;
+
+        updateReviewBtn()
+        updateReviewCount()
+
+        if (reviewMode && !flashcards[currentIndex].needsReview) {
+            const reviewCount = allFlashcards.filter(card => card.needsReview).length;
+
+            if (reviewCount === 0) {
+                toggleReviewMode();
+            } else {
+                flashcards = allFlashcards.filter(card => card.needsReview);
+
+                if (currentIndex >= flashcards.length) {
+                    currentIndex = 0;
+                }
+
+                showCard()
+            }
+
+        }
+    }
+
+    function updateReviewBtn () {
+        const button = document.getElementById('reviewBtn');
+        if (flashcards[currentIndex].needsReview) {
+            button.textContent = '✓ Marked for Review'
+            button.style.background = '#e74c3c';
+        } else {
+            button.textContent = '⚑ Mark for Review';
+            button.style.background = '#f39c12';
+        }
+    }
+
+    function updateReviewCount() {
+        const count = allFlashcards.filter(card => card.needsReview).length;
+        document.getElementById('reviewCount').textContent = count;
+
+        const reviewModeBtn = document.getElementById('reviewModeBtn');
+        reviewModeBtn.disabled = (count === 0);
+    }
+
+    function toggleReviewMode() {
+        reviewMode = !reviewMode;
+        const button = document.getElementById('reviewModeBtn');
+        const currentCard = flashcards[currentIndex];
+
+        if (reviewMode) {
+            flashcards = allFlashcards.filter(card => card.needsReview);
+            button.textContent = 'Show All Cards'
+            currentIndex = 0
+        } else {
+            flashcards = allFlashcards;
+            button.textContent = 'Show Review Cards';
+
+            const newIndex = flashcards.indexOf(currentCard)
+            currentIndex = (newIndex !== -1) ? newIndex : 0;
+        }
+
+        showCard();
     }
 
     function nextCard() {
